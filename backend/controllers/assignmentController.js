@@ -1,90 +1,128 @@
-const { assignments, studyGoals } = require("../data/db");
 const Assignment = require("../models/assignmentModel");
+const StudyGoal = require("../models/studyGoalModel");
 
-// CREATE (včetně kontroly vazby)
-const createAssignment = (req, res) => {
-  const { title, description, deadline, studyGoalId } = req.body;
+// CREATE
+const createAssignment = async (req, res) => {
+  try {
+    const { title, description, deadline, dueDate, status, studyGoalId } = req.body;
 
-  if (!title) {
-    return res.status(400).json({ error: "Title is required" });
+    if (!title) {
+      return res.status(400).json({ error: "Title is required" });
+    }
+
+    if (studyGoalId) {
+      const goalExists = await StudyGoal.findById(studyGoalId);
+
+      if (!goalExists) {
+        return res.status(400).json({ error: "StudyGoal does not exist" });
+      }
+    }
+
+    const newAssignment = await Assignment.create({
+      title,
+      description,
+      deadline: deadline || dueDate || "",
+      status,
+      studyGoalId: studyGoalId || null,
+    });
+
+    res.status(201).json(newAssignment);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-
-  const goalExists = studyGoals.find((g) => g.id === studyGoalId);
-
-  if (!goalExists) {
-    return res.status(400).json({ error: "StudyGoal does not exist" });
-  }
-
-  const newAssignment = new Assignment({
-    title,
-    description,
-    deadline,
-    studyGoalId,
-  });
-
-  assignments.push(newAssignment);
-
-  res.status(201).json(newAssignment);
 };
 
 // GET
-const getAssignment = (req, res) => {
-  const { id } = req.query;
+const getAssignment = async (req, res) => {
+  try {
+    const { id } = req.query;
 
-  const assignment = assignments.find((a) => a.id === id);
+    const assignment = await Assignment.findById(id);
 
-  if (!assignment) {
-    return res.status(404).json({ error: "Assignment not found" });
+    if (!assignment) {
+      return res.status(404).json({ error: "Assignment not found" });
+    }
+
+    res.json(assignment);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-
-  res.json(assignment);
 };
 
-// LIST (filtrování podle studyGoalId)
-const listAssignments = (req, res) => {
-  const { studyGoalId } = req.query;
+// LIST
+const listAssignments = async (req, res) => {
+  try {
+    const { studyGoalId } = req.query;
 
-  if (studyGoalId) {
-    const filtered = assignments.filter(
-      (a) => a.studyGoalId === studyGoalId
-    );
-    return res.json(filtered);
+    const filter = studyGoalId ? { studyGoalId } : {};
+    const assignments = await Assignment.find(filter).sort({ createdAt: -1 });
+
+    res.json(assignments);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-
-  res.json(assignments);
 };
 
 // UPDATE
-const updateAssignment = (req, res) => {
-  const { id, title, description, deadline, completed } = req.body;
+const updateAssignment = async (req, res) => {
+  try {
+    const {
+      id,
+      title,
+      description,
+      deadline,
+      dueDate,
+      status,
+      studyGoalId,
+    } = req.body;
 
-  const assignment = assignments.find((a) => a.id === id);
+    const assignment = await Assignment.findById(id);
 
-  if (!assignment) {
-    return res.status(404).json({ error: "Assignment not found" });
+    if (!assignment) {
+      return res.status(404).json({ error: "Assignment not found" });
+    }
+
+    if (studyGoalId) {
+      const goalExists = await StudyGoal.findById(studyGoalId);
+
+      if (!goalExists) {
+        return res.status(400).json({ error: "StudyGoal does not exist" });
+      }
+    }
+
+    if (title !== undefined) assignment.title = title;
+    if (description !== undefined) assignment.description = description;
+    if (deadline !== undefined || dueDate !== undefined) {
+      assignment.deadline = deadline || dueDate || "";
+    }
+    if (status !== undefined) assignment.status = status;
+    if (studyGoalId !== undefined) assignment.studyGoalId = studyGoalId || null;
+
+    const updatedAssignment = await assignment.save();
+
+    res.json(updatedAssignment);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-
-  if (title !== undefined) assignment.title = title;
-  if (description !== undefined) assignment.description = description;
-  if (deadline !== undefined) assignment.deadline = deadline;
-  if (completed !== undefined) assignment.completed = completed;
-
-  res.json(assignment);
 };
 
 // DELETE
-const deleteAssignment = (req, res) => {
-  const { id } = req.query;
+const deleteAssignment = async (req, res) => {
+  try {
+    const { id } = req.query;
 
-  const index = assignments.findIndex((a) => a.id === id);
+    const assignment = await Assignment.findById(id);
 
-  if (index === -1) {
-    return res.status(404).json({ error: "Assignment not found" });
+    if (!assignment) {
+      return res.status(404).json({ error: "Assignment not found" });
+    }
+
+    await Assignment.findByIdAndDelete(id);
+
+    res.json({ message: "Assignment deleted" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-
-  assignments.splice(index, 1);
-
-  res.json({ message: "Assignment deleted" });
 };
 
 module.exports = {

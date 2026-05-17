@@ -1,5 +1,9 @@
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
+
+const connectDb = require("./data/db");
 
 const studyGoalRoutes = require("./routes/studyGoalRoutes");
 const assignmentRoutes = require("./routes/assignmentRoutes");
@@ -12,6 +16,10 @@ app.use(express.json());
 app.use("/studyGoal", studyGoalRoutes);
 app.use("/assignment", assignmentRoutes);
 
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
+const port = process.env.PORT || 3000;
+
+connectDb().then(() => {
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
 });

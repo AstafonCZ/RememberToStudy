@@ -1,80 +1,103 @@
-const { studyGoals, assignments } = require("../data/db");
 const StudyGoal = require("../models/studyGoalModel");
+const Assignment = require("../models/assignmentModel");
 
 // CREATE
-const createStudyGoal = (req, res) => {
-  const { name, description, targetDate } = req.body;
+const createStudyGoal = async (req, res) => {
+  try {
+    const { title, name, description, subject, status, targetDate } = req.body;
 
-  if (!name) {
-    return res.status(400).json({ error: "Name is required" });
+    const finalTitle = title || name;
+
+    if (!finalTitle) {
+      return res.status(400).json({ error: "Title is required" });
+    }
+
+    const newGoal = await StudyGoal.create({
+      title: finalTitle,
+      description,
+      subject,
+      status,
+      targetDate,
+    });
+
+    res.status(201).json(newGoal);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-
-  const newGoal = new StudyGoal({
-    name,
-    description,
-    targetDate,
-  });
-
-  studyGoals.push(newGoal);
-
-  res.status(201).json(newGoal);
 };
 
 // GET
-const getStudyGoal = (req, res) => {
-  const { id } = req.query;
+const getStudyGoal = async (req, res) => {
+  try {
+    const { id } = req.query;
 
-  const goal = studyGoals.find((g) => g.id === id);
+    const goal = await StudyGoal.findById(id);
 
-  if (!goal) {
-    return res.status(404).json({ error: "StudyGoal not found" });
+    if (!goal) {
+      return res.status(404).json({ error: "StudyGoal not found" });
+    }
+
+    res.json(goal);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-
-  res.json(goal);
 };
 
 // LIST
-const listStudyGoals = (req, res) => {
-  res.json(studyGoals);
+const listStudyGoals = async (req, res) => {
+  try {
+    const goals = await StudyGoal.find().sort({ createdAt: -1 });
+    res.json(goals);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
 // UPDATE
-const updateStudyGoal = (req, res) => {
-  const { id, name, description, targetDate } = req.body;
+const updateStudyGoal = async (req, res) => {
+  try {
+    const { id, title, name, description, subject, status, targetDate } = req.body;
 
-  const goal = studyGoals.find((g) => g.id === id);
+    const finalTitle = title || name;
 
-  if (!goal) {
-    return res.status(404).json({ error: "StudyGoal not found" });
+    const goal = await StudyGoal.findById(id);
+
+    if (!goal) {
+      return res.status(404).json({ error: "StudyGoal not found" });
+    }
+
+    if (finalTitle !== undefined) goal.title = finalTitle;
+    if (description !== undefined) goal.description = description;
+    if (subject !== undefined) goal.subject = subject;
+    if (status !== undefined) goal.status = status;
+    if (targetDate !== undefined) goal.targetDate = targetDate;
+
+    const updatedGoal = await goal.save();
+
+    res.json(updatedGoal);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-
-  if (name !== undefined) goal.name = name;
-  if (description !== undefined) goal.description = description;
-  if (targetDate !== undefined) goal.targetDate = targetDate;
-
-  res.json(goal);
 };
 
-// DELETE (včetně assignments)
-const deleteStudyGoal = (req, res) => {
-  const { id } = req.query;
+// DELETE
+const deleteStudyGoal = async (req, res) => {
+  try {
+    const { id } = req.query;
 
-  const index = studyGoals.findIndex((g) => g.id === id);
+    const goal = await StudyGoal.findById(id);
 
-  if (index === -1) {
-    return res.status(404).json({ error: "StudyGoal not found" });
-  }
-
-  // delete related assignments
-  for (let i = assignments.length - 1; i >= 0; i--) {
-    if (assignments[i].studyGoalId === id) {
-      assignments.splice(i, 1);
+    if (!goal) {
+      return res.status(404).json({ error: "StudyGoal not found" });
     }
+
+    await Assignment.deleteMany({ studyGoalId: id });
+    await StudyGoal.findByIdAndDelete(id);
+
+    res.json({ message: "StudyGoal and related assignments deleted" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-
-  studyGoals.splice(index, 1);
-
-  res.json({ message: "StudyGoal and related assignments deleted" });
 };
 
 module.exports = {
